@@ -16,6 +16,29 @@ use Illuminate\Support\Str;
 
 class Model extends Eloquent
 {
+    protected static $prefix;
+
+
+    public static function setPrefix($prefix)
+    {
+        self::$prefix = $prefix;
+    }
+
+    /**
+     * Get the table associated with the model.
+     *
+     * @return string
+     */
+    public function getTable()
+    {
+        $table = parent::getTable();
+        if (self::$prefix) {
+            $table = self::$prefix . $table;
+        }
+
+        return $table;
+    }
+
     public function hasMany($related, $foreignKey = null, $localKey = null)
     {
         $foreignKey = $foreignKey ?: $this->getForeignKey();
