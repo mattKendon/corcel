@@ -61,6 +61,13 @@ class PostTest extends PHPUnit_Framework_TestCase
         $this->assertTrue($post->meta instanceof \Corcel\PostMetaCollection);
     }
 
+    public function testPostCustomFieldAccessors()
+    {
+        $post = Post::find(2);
+
+        $this->assertEquals($post->meta->username, $post->username);
+    }
+
     public function testPostOrderBy()
     {
         $posts = Post::orderBy('post_date', 'asc')->take(5)->get();
@@ -182,5 +189,27 @@ class PostTest extends PHPUnit_Framework_TestCase
         $postType = 'video';
         $post = new Post(['post_type' => $postType]);
         $this->assertEquals($postType, $post->post_type);
+    }
+
+    public function testPostHasRevisions()
+    {
+        $post = Post::find(1);
+
+        $this->assertInstanceOf('\Illuminate\Database\Eloquent\Collection', $post->revision);
+        $this->assertCount(1, $post->revision);
+        $this->assertInstanceOf('\Corcel\Revision', $post->revision->first());
+    }
+
+    public function testPostUsesRevision()
+    {
+        $originalPost = Post::find(1);
+        $post = Post::find(1);
+        $revision = $post->revision()->first();
+        $post->useRevision($revision);
+
+        $this->assertEquals($revision->title, $post->title);
+        $this->assertEquals($revision->content, $post->content);
+        $this->assertNotEquals($originalPost->title, $post->title);
+        $this->assertNotEquals($originalPost->content, $post->content);
     }
 }

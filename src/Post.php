@@ -65,6 +65,9 @@ class Post extends Model
         'keywords_str',
     ];
 
+    /** @var Revision */
+    protected $revisionPost;
+
     public function __construct(array $attributes = [])
     {
         foreach ($this->fillable as $field) {
@@ -148,7 +151,7 @@ class Post extends Model
      */
     public function revision()
     {
-        return $this->hasMany('Corcel\Post', 'post_parent')->where('post_type', 'revision');
+        return $this->hasMany('Corcel\Revision', 'post_parent');
     }
 
     /**
@@ -177,51 +180,70 @@ class Post extends Model
         return $builder;
     }
 
-    /**
-     * Magic method to return the meta data like the post original fields.
-     *
-     * @param string $key
-     *
-     * @return string
-     */
-    public function __get($key)
+    public function getAttribute($key)
     {
-        if (!isset($this->$key)) {
-            if (isset($this->meta->$key)) {
-                return $this->meta->$key;
-            }
-        } elseif (isset($this->$key) and empty($this->$key)) {
+        $value = parent::getAttribute($key);
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        if (isset($this->meta) && $this->meta->keyBy('meta_key')->has($key)) {
+            return $this->meta->$key;
+        }
+
+    }
+
+    public function useRevision(Revision $revision = null)
+    {
+        $this->revisionPost = $revision;
+    }
+
+    protected function getAttributeFromArray($key)
+    {
+        if ($this->revisionPost && !in_array($key, ['ID'])) {
+            return $this->revisionPost->getAttributeValue($key);
+        }
+
+        return parent::getAttributeFromArray($key);
+    }
+
+
+    public function getAttributeValue($key)
+    {
+        $value = parent::getAttributeValue($key);
+
+        if (!$value && in_array($key, ['post_title', 'post_name'])) {
             // fix for menu items when chosing category to show
-            if (in_array($key, ['post_title', 'post_name'])) {
-                $type = $this->meta->_menu_item_object;
-                $taxonomy = null;
+            $type = $this->meta->_menu_item_object;
+            $taxonomy = null;
 
-                // Support certain types of meta objects
-                if ($type == 'category') {
-                    $taxonomy = $this->meta()->where('meta_key', '_menu_item_object_id')
-                        ->first()->taxonomy('meta_value')->first();
-                } elseif ($type == 'post_tag') {
-                    $taxonomy = $this->meta()->where('meta_key', '_menu_item_object_id')
-                        ->first()->taxonomy('meta_value')->first();
-                } elseif ($type == 'post') {
-                    $post = $this->meta()->where('meta_key', '_menu_item_object_id')
-                        ->first()->post(true)->first();
+            // Support certain types of meta objects
+            if ($type == 'category') {
+                $taxonomy = $this->meta()->where('meta_key', '_menu_item_object_id')
+                    ->first()->taxonomy('meta_value')->first();
+            } elseif ($type == 'post_tag') {
+                $taxonomy = $this->meta()->where('meta_key', '_menu_item_object_id')
+                    ->first()->taxonomy('meta_value')->first();
+            } elseif ($type == 'post') {
+                $post = $this->meta()->where('meta_key', '_menu_item_object_id')
+                    ->first()->post(true)->first();
 
-                    return $post->$key;
-                }
+                return $post->$key;
+            }
 
-                if (isset($taxonomy) && $taxonomy->exists) {
-                    if ($key == 'post_title') {
-                        return $taxonomy->name;
-                    } elseif ($key == 'post_name') {
-                        return $taxonomy->slug;
-                    }
+            if (isset($taxonomy) && $taxonomy->exists) {
+                if ($key == 'post_title') {
+                    return $taxonomy->name;
+                } elseif ($key == 'post_name') {
+                    return $taxonomy->slug;
                 }
             }
         }
 
-        return parent::__get($key);
+        return $value;
     }
+
 
     public function save(array $options = array())
     {
